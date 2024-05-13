@@ -373,7 +373,7 @@ class ColaProcessor(DataProcessor):
           InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
     return examples
 
-
+"""convert_single_example()将一个样本(字符串类型)，经过符号化等一系列操作，转换成神经网络可以使用的InputFeature(List向量类型)"""
 def convert_single_example(ex_index, example, label_list, max_seq_length,
                            tokenizer):
   """Converts a single `InputExample` into a single `InputFeatures`."""
