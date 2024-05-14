@@ -204,6 +204,120 @@ class DataProcessor(object):
       return lines
 
 
+"""TODO ===============自己的dataProcessor trec06c 数据 原始email，散装数据====================="""
+"""需要继承 DataProcessor，并重新里面的几个数据预处理函数。"""
+class CN_trec06c_Processor(DataProcessor):    
+  def __init__(self):
+      """ 定义一些超参数"""
+    self.MAX_EMAIL_LENGTH = 400   #最长单个邮件长度
+  def get_email_file(self,base_path,path_list):
+    email_str_list = []
+    for i in range(len(path_list)):
+      with open(base_path + path_list[i][1:],'r',encoding='gbk') as fin:
+        words = ""
+        begin_tag = 0
+        wrong_tag = 0
+        while(True):
+          if wrong_tag > 20 or len(words)>self.MAX_EMAIL_LENGTH:
+            break
+          try:
+            line = fin.readline()
+            wrong_tag = 0
+          except:
+            wrong_tag += 1
+            continue
+          if (not line):
+            break
+          if(begin_tag == 0):
+            if(line=='\n'):
+              begin_tag = 1
+            continue
+          else:
+            words += line.strip() + ' '
+            if len(words)>self.MAX_EMAIL_LENGTH:
+              break
+        if len(words)>=10:   """ 语句最短长度"""
+          email_str_list.append(words)
+    return email_str_list
+  def get_all_examples(self):
+    trec06Path = "../../02_SVM_analysis/data/"  """ trec06c数据位置 """
+    path_list_spam = []
+    with open(trec06Path+'CN_index_spam','r',encoding='utf-8') as fin:
+      for line in fin.readlines():
+        path_list_spam.append(line.strip())
+    path_list_ham = []
+    with open(trec06Path+'CN_index_ham','r',encoding='utf-8') as fin:
+      for line in fin.readlines():
+        path_list_ham.append(line.strip())
+      """ 是否对原始数据长度作裁剪  共 21766 个 正例  21766个 负例"""
+    path_list_spam = path_list_spam[:100]  """这里仅取100个样本进行本机测试"""
+    path_list_ham = path_list_ham[:100]
+    spam_email_list = self.get_email_file(trec06Path[:-6],path_list_spam)
+    ham_email_list = self.get_email_file(trec06Path[:-6],path_list_ham)
+    print("*****************====================*****************")
+    print("正例样本数量： ",len(ham_email_list))
+    print("反例样本数量： ",len(spam_email_list))
+    with open('model_spam_tuning/CN_trec06c/train_sample_stat.txt','w',encoding='utf-8') as fout:
+      fout.write("正例样本数量： " + str(len(ham_email_list)) + '\n')
+      fout.write("反例样本数量： " + str(len(spam_email_list)) + '\n')
+    print("*****************====================*****************")
+    examples = []
+    for i in range(len(spam_email_list)):
+      guid = "train-%d" % (i)  # 从 0 开始
+      """ TODO 下方，tokenization.convert_to_unicode() 函数，将byte类数据 decode成为'utf-8'   """
+      text_a = tokenization.convert_to_unicode(str(spam_email_list[i]))
+      label = '0' """ 转int类 是后续的操作，此处仍旧是str 垃圾邮件label为0 """
+      examples.append(
+          InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+    for i in range(len(ham_email_list)):
+      guid = "train-%d" % (i+len(spam_email_list))  """ 从 垃圾邮件长度 开始向后续"""
+      """ TODO 下方，tokenization.convert_to_unicode() 函数，将byte类数据 decode成为'utf-8'  """
+      text_a = tokenization.convert_to_unicode(str(ham_email_list[i]))
+      label = '1' """ 转int类 是后续的操作，此处仍旧是str 正常邮件label为1"""
+      examples.append(
+          InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+      """ TODO 还要进行切分 测试集，训练集，验证集"""
+      return examples
+  
+    def get_train_examples(self, data_dir):
+      # train_data_path = os.path.join(data_dir, "cn_train_tiny_tiny.csv") """ 训练集 数据文件名称，可以在这里改"""
+      examples = self.get_all_examples()
+      ex_new = []
+      for i in range(len(examples)):
+        if i%10 != 1 and i%10 != 2: """ 8:1:1 切分训练集，验证集，测试集"""
+          ex_new.append(examples[i])
+      return ex_new
+  
+    def get_dev_examples(self, data_dir):
+      """Gets a collection of `InputExample`s for the dev set."""
+      examples = self.get_all_examples()
+      ex_new = []
+      for i in range(len(examples)):
+        if i%10 == 1:  """ 8:1:1 切分训练集，验证集，测试集"""
+          ex_new.append(examples[i])
+      return ex_new
+  
+    def get_test_examples(self, data_dir):
+      """Gets a collection of `InputExample`s for prediction."""
+      test_set_txt = []
+      test_set_label = []
+      examples = self.get_all_examples()
+      ex_new = []
+      for i in range(len(examples)):
+        if i%10 == 2:  """ 8:1:1 切分训练集，验证集，测试集"""
+          ex_new.append(examples[i])
+          test_set_txt.append(examples[i].text_a)
+          test_set_label.append(examples[i].label)
+      with open('model_spam_tuning/CN_trec06c/test_origin.txt','w',encoding='utf-8') as fout:
+        for i in range(len(test_set_label)):
+          fout.write(test_set_label[i]+'\t'+test_set_txt[i]+'\n')
+      return ex_new
+ 
+    def get_labels(self):
+     """Gets the list of labels for this data set."""
+     return ['0','1']
+ """ TODO ===============自己的dataProcessor trec06c 数据====================="""
+
 class XnliProcessor(DataProcessor):
   """Processor for the XNLI data set."""
 
@@ -783,11 +897,15 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
 
+"""  "cn_tiny":CN_tiny_Processor,    # 添加自己的数据处理类    """
+"""  "en_trec06p":EN_trec06p_Processor,    # 处理 英文 trec06 散装邮件数据 """
+    
   processors = {
       "cola": ColaProcessor,
       "mnli": MnliProcessor,
       "mrpc": MrpcProcessor,
       "xnli": XnliProcessor,
+      "cn_trec06c":CN_trec06c_Processor,    # 处理 中文 trec06 散装邮件数据  
   }
 
   tokenization.validate_case_matches_checkpoint(FLAGS.do_lower_case,
