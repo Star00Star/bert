@@ -209,7 +209,11 @@ class DataProcessor(object):
 class CN_trec06c_Processor(DataProcessor):    
   def __init__(self):
       """ 定义一些超参数"""
-    self.MAX_EMAIL_LENGTH = 400   #最长单个邮件长度
+    """self.MAX_EMAIL_LENGTH = 400   最长单个邮件长度"""
+      Max_seq_length = 64
+      Train_batch_size = 32
+      Learning_rate = 2e-6
+      epochs = 25.0
   def get_email_file(self,base_path,path_list):
     email_str_list = []
     for i in range(len(path_list)):
